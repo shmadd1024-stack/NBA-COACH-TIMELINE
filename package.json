@@ -1,9 +1,8 @@
 {
-  "name": "react",
+  "name": "my-app",
   "version": "1.0.0",
   "description": "",
   "keywords": [],
-  "main": "src/index.tsx",
   "dependencies": {
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
