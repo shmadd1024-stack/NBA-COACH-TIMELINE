@@ -4,8 +4,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const BBREF_ABBREV: Record<string, string> = {
   'Atlanta Hawks':           'ATL',
   'Boston Celtics':          'BOS',
-  'Brooklyn Nets':           'BRK',
-  'Charlotte Hornets':       'CHO',
+  'Brooklyn Nets':           'NJN',  // full franchise history lives at /teams/NJN/
+  'Charlotte Hornets':       'CHA',  // Bobcats-lineage franchise
   'Chicago Bulls':           'CHI',
   'Cleveland Cavaliers':     'CLE',
   'Dallas Mavericks':        'DAL',
@@ -20,7 +20,7 @@ const BBREF_ABBREV: Record<string, string> = {
   'Miami Heat':              'MIA',
   'Milwaukee Bucks':         'MIL',
   'Minnesota Timberwolves':  'MIN',
-  'New Orleans Pelicans':    'NOP',
+  'New Orleans Pelicans':    'NOH',  // franchise history (Charlotte Hornets → NOH → NOP)
   'New York Knicks':         'NYK',
   'Oklahoma City Thunder':   'OKC',
   'Orlando Magic':           'ORL',
