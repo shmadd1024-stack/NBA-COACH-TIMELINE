@@ -40,8 +40,24 @@ function shortName(franchise) {
 
 // ─── CoachDetail ─────────────────────────────────────────────────────────────
 
-function CoachDetail({ coach, seasonData, loadingSeasons }) {
+function CoachDetail({ coach, seasonData, loadingSeasons, allStints = [] }) {
   const color   = TEAM_COLORS[coach.teams[0]] || '#444';
+
+  // Detect seasons where another head coach also coached that franchise —
+  // meaning this coach was hired or fired mid-season that year.
+  const partialSeasonKeys = useMemo(() => {
+    const keys = new Set();
+    for (const row of seasonData) {
+      const shared = allStints.some(s =>
+        s.coach !== coach.coach &&
+        s.franchise === row.franchise &&
+        s.start <= row.season_year &&
+        s.end - 1 >= row.season_year
+      );
+      if (shared) keys.add(`${row.franchise}|${row.season_year}`);
+    }
+    return keys;
+  }, [seasonData, allStints, coach.coach]);
 
   const rtgRows = seasonData.filter(r => r.ortg != null);
   const avgOrtg = rtgRows.length ? rtgRows.reduce((s, r) => s + r.ortg, 0) / rtgRows.length : null;
@@ -205,6 +221,7 @@ function CoachDetail({ coach, seasonData, loadingSeasons }) {
                     const netRtg    = row.ortg != null && row.drtg != null ? row.ortg - row.drtg : null;
                     const rawDiff   = row.pts_for != null && row.pts_against != null ? row.pts_for - row.pts_against : null;
                     const fmtNet    = (n) => n != null ? (n > 0 ? '+' : '') + n.toFixed(1) : '—';
+                    const isPartial = partialSeasonKeys.has(`${row.franchise}|${row.season_year}`);
                     return (
                       <tr key={i} style={{ borderBottom: '1px solid #f5f5f5', background: i % 2 === 0 ? '#fff' : '#fafafa' }}>
                         <td style={{ padding: '5px 6px', color: '#666', fontWeight: 600, whiteSpace: 'nowrap' }}>
@@ -213,8 +230,15 @@ function CoachDetail({ coach, seasonData, loadingSeasons }) {
                         <td style={{ padding: '5px 6px', color: TEAM_COLORS[getHistoricalName(row.franchise, row.season_year)] || '#444', fontWeight: 600, fontSize: 11, whiteSpace: 'nowrap' }}>
                           {getHistoricalName(row.franchise, row.season_year)}
                         </td>
-                        <td style={{ padding: '5px 6px', textAlign: 'right', color: '#2e7d32', fontWeight: 700 }}>{row.wins ?? '—'}</td>
-                        <td style={{ padding: '5px 6px', textAlign: 'right', color: '#c62828' }}>{row.losses ?? '—'}</td>
+                        {/* W/L: gray + asterisk for shared (mid-season change) seasons */}
+                        <td style={{ padding: '5px 6px', textAlign: 'right', color: isPartial ? '#aaa' : '#2e7d32', fontWeight: 700 }}
+                            title={isPartial ? 'Franchise season record — coach change mid-season' : undefined}>
+                          {row.wins ?? '—'}{isPartial ? '*' : ''}
+                        </td>
+                        <td style={{ padding: '5px 6px', textAlign: 'right', color: isPartial ? '#aaa' : '#c62828' }}
+                            title={isPartial ? 'Franchise season record — coach change mid-season' : undefined}>
+                          {row.losses ?? '—'}{isPartial ? '*' : ''}
+                        </td>
                         {/* Raw PPG */}
                         <td style={{ padding: '5px 6px', textAlign: 'right', color: '#e65100', fontWeight: 700 }}>
                           {row.pts_for != null ? row.pts_for.toFixed(1) : '—'}
@@ -243,6 +267,11 @@ function CoachDetail({ coach, seasonData, loadingSeasons }) {
                 </tbody>
               </table>
             </div>
+            {partialSeasonKeys.size > 0 && (
+              <div style={{ padding: '6px 8px 2px', fontSize: 10, color: '#bbb', fontStyle: 'italic' }}>
+                * Franchise season record — coaching change occurred mid-season
+              </div>
+            )}
           </>
         )}
       </div>
@@ -412,6 +441,7 @@ export default function CoachesTab({ coachData }) {
             coach={selectedCoachData}
             seasonData={seasonData}
             loadingSeasons={loadingSeasons}
+            allStints={coachData}
           />
         ) : (
           <div style={{
