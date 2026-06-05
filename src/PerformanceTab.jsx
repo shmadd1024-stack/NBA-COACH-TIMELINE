@@ -46,6 +46,87 @@ function stintSeasons(s, allSeasons) {
     .sort((a, b) => a.season_year - b.season_year);
 }
 
+// True if this coach was replaced mid-season (successor has mid_season_start).
+function isMidSeasonEnd(s, allStints) {
+  return allStints.some(other =>
+    other.franchise === s.franchise &&
+    other.start === s.end &&
+    other.mid_season_start &&
+    other.coach !== s.coach
+  );
+}
+
+// Return season rows with wins/losses corrected for partial seasons.
+//
+// coaching_stints.wins/losses excludes games from the partial *start* season
+// (season_year = start-1 when mid_season_start) but includes the partial *end*
+// season (season_year = end-1 when fired mid-year).
+//
+// Partial-end record  = stintW - sum(true full seasons)
+// Partial-start record = franchise season - predecessor's partial-end record
+//   (where predecessor's partial-end = predStintW - sum(pred true full seasons))
+function correctedStintSeasons(s, rawSeasons, allSeasons, allStints) {
+  if (!rawSeasons.length) return rawSeasons;
+  const midStart = s.mid_season_start;
+  const midEnd   = isMidSeasonEnd(s, allStints);
+  if (!midStart && !midEnd) return rawSeasons;
+
+  const seasons = rawSeasons.map(r => ({ ...r }));
+
+  // ── Partial LAST season ──────────────────────────────────────────────────────
+  if (midEnd) {
+    // True full seasons: exclude partial start (idx 0 when midStart) and partial end (last).
+    const fullSlice = midStart ? seasons.slice(1, -1) : seasons.slice(0, -1);
+    const fullW = fullSlice.reduce((a, r) => a + r.wins, 0);
+    const fullL = fullSlice.reduce((a, r) => a + r.losses, 0);
+    const lastW = Math.max(0, s.wins - fullW);
+    const lastL = Math.max(0, s.losses - fullL);
+    seasons[seasons.length - 1] = { ...seasons[seasons.length - 1], wins: lastW, losses: lastL };
+  }
+
+  // ── Partial FIRST season ─────────────────────────────────────────────────────
+  if (midStart) {
+    const partialYear = s.start - 1;
+    const fSeason = allSeasons.find(r =>
+      r.franchise === s.franchise && r.season_year === partialYear
+    );
+
+    if (!fSeason) {
+      seasons[0] = { ...seasons[0], wins: 0, losses: 0 };
+    } else {
+      // Find the predecessor who was coaching when this season began.
+      const pred = allStints.find(other =>
+        other.franchise === s.franchise &&
+        other.end === s.start &&
+        other.coach !== s.coach
+      );
+
+      if (!pred) {
+        // No predecessor found (e.g. first coach of a new franchise) — keep franchise total.
+        seasons[0] = { ...seasons[0], wins: fSeason.wins, losses: fSeason.losses };
+      } else {
+        // Compute how many games pred coached in this shared season.
+        // pred always has a mid-season end here (we replaced them), so their true full
+        // seasons exclude their last year. Also exclude their partial start if they had one.
+        const predRaw  = stintSeasons(pred, allSeasons);
+        const predFull = pred.mid_season_start ? predRaw.slice(1, -1) : predRaw.slice(0, -1);
+        const predFullW = predFull.reduce((a, r) => a + r.wins, 0);
+        const predFullL = predFull.reduce((a, r) => a + r.losses, 0);
+        const predPartialW = Math.max(0, pred.wins - predFullW);
+        const predPartialL = Math.max(0, pred.losses - predFullL);
+
+        seasons[0] = {
+          ...seasons[0],
+          wins:   Math.max(0, fSeason.wins   - predPartialW),
+          losses: Math.max(0, fSeason.losses - predPartialL),
+        };
+      }
+    }
+  }
+
+  return seasons;
+}
+
 function seasonMetrics(seasons) {
   if (!seasons.length) return null;
   const first3 = seasons.slice(0, 3);
@@ -65,7 +146,7 @@ function seasonMetrics(seasons) {
 function buildPoints(coachData, allSeasons, byStint) {
   if (byStint) {
     return coachData.flatMap(s => {
-      const seasons = stintSeasons(s, allSeasons);
+      const seasons = correctedStintSeasons(s, stintSeasons(s, allSeasons), allSeasons, coachData);
       const m = seasonMetrics(seasons);
       if (!m) return [];
       return [{
@@ -97,7 +178,7 @@ function buildPoints(coachData, allSeasons, byStint) {
   return Object.entries(byCoach).flatMap(([coach, stints]) => {
     stints.sort((a, b) => a.start - b.start);
     const allS = stints
-      .flatMap(s => stintSeasons(s, allSeasons))
+      .flatMap(s => correctedStintSeasons(s, stintSeasons(s, allSeasons), allSeasons, coachData))
       .sort((a, b) => a.season_year - b.season_year);
     const m = seasonMetrics(allS);
     if (!m) return [];
@@ -137,7 +218,7 @@ function buildTimelineSeries(addedIds, coachData, allSeasons, byStint) {
     coachData.forEach(s => {
       const id = `${s.coach}|${s.franchise}|${s.start}`;
       if (!addedIds.has(id)) return;
-      const seasons = stintSeasons(s, allSeasons);
+      const seasons = correctedStintSeasons(s, stintSeasons(s, allSeasons), allSeasons, coachData);
       if (!seasons.length) return;
       result.push({
         id,
@@ -166,7 +247,7 @@ function buildTimelineSeries(addedIds, coachData, allSeasons, byStint) {
       if (!addedIds.has(coach)) return;
       stints.sort((a, b) => a.start - b.start);
       const allS = stints
-        .flatMap(s => stintSeasons(s, allSeasons))
+        .flatMap(s => correctedStintSeasons(s, stintSeasons(s, allSeasons), allSeasons, coachData))
         .sort((a, b) => a.season_year - b.season_year);
       if (!allS.length) return;
       const primary = [...stints].sort((a, b) => (b.end - b.start) - (a.end - a.start))[0];
