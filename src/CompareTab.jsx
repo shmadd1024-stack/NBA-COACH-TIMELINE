@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { TEAM_COLORS, COACH_CHAMPS } from './constants';
+import { TEAM_COLORS, COACH_CHAMPS, getHistoricalName } from './constants';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -165,7 +165,7 @@ function StintsTable({ stats, accent }) {
           return (
             <tr key={i} style={{ borderBottom: '1px solid #f5f5f5' }}>
               <td style={{ padding: '5px 6px', color: TEAM_COLORS[s.franchise] || '#444', fontWeight: 600, fontSize: 11 }}>
-                {shortName(s.franchise)}
+                {getHistoricalName(s.franchise, s.start)}
               </td>
               <td style={{ padding: '5px 6px', textAlign: 'right', color: '#999' }}>{s.end - s.start}</td>
               <td style={{ padding: '5px 6px', textAlign: 'right', color: '#2e7d32', fontWeight: 700 }}>{s.wins}</td>

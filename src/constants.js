@@ -109,6 +109,107 @@ export function coachChamps(coach, franchise, start, end) {
   return COACH_CHAMPS[coach] ?? 0;
 }
 
+/**
+ * Historical team names sourced from NBA.com/stats/history.
+ * Each entry: { from: season_year, to: season_year_inclusive, name: string }
+ * season_year = first calendar year of the season (e.g. 2007 = 2007-08).
+ * Only franchises that changed names are listed; others use their current name.
+ */
+export const FRANCHISE_NAME_HISTORY = {
+  'Atlanta Hawks': [
+    { from: 1949, to: 1950, name: 'Tri-Cities Blackhawks' },
+    { from: 1951, to: 1954, name: 'Milwaukee Hawks' },
+    { from: 1955, to: 1967, name: 'St. Louis Hawks' },
+    { from: 1968,           name: 'Atlanta Hawks' },
+  ],
+  'Brooklyn Nets': [
+    { from: 1976, to: 1976, name: 'New York Nets' },
+    { from: 1977, to: 2011, name: 'New Jersey Nets' },
+    { from: 2012,           name: 'Brooklyn Nets' },
+  ],
+  'Charlotte Hornets': [
+    // Bobcats expansion franchise (our DB uses CHA/CHO)
+    { from: 2004, to: 2013, name: 'Charlotte Bobcats' },
+    { from: 2014,           name: 'Charlotte Hornets' },
+  ],
+  'Detroit Pistons': [
+    { from: 1948, to: 1956, name: 'Fort Wayne Pistons' },
+    { from: 1957,           name: 'Detroit Pistons' },
+  ],
+  'Golden State Warriors': [
+    { from: 1946, to: 1961, name: 'Philadelphia Warriors' },
+    { from: 1962, to: 1970, name: 'San Francisco Warriors' },
+    { from: 1971,           name: 'Golden State Warriors' },
+  ],
+  'Houston Rockets': [
+    { from: 1967, to: 1970, name: 'San Diego Rockets' },
+    { from: 1971,           name: 'Houston Rockets' },
+  ],
+  'Los Angeles Clippers': [
+    { from: 1970, to: 1977, name: 'Buffalo Braves' },
+    { from: 1978, to: 1983, name: 'San Diego Clippers' },
+    { from: 1984,           name: 'Los Angeles Clippers' },
+  ],
+  'Los Angeles Lakers': [
+    { from: 1948, to: 1959, name: 'Minneapolis Lakers' },
+    { from: 1960,           name: 'Los Angeles Lakers' },
+  ],
+  'Memphis Grizzlies': [
+    { from: 1995, to: 2000, name: 'Vancouver Grizzlies' },
+    { from: 2001,           name: 'Memphis Grizzlies' },
+  ],
+  'New Orleans Pelicans': [
+    // Original Charlotte Hornets franchise that relocated
+    { from: 1988, to: 2001, name: 'Charlotte Hornets' },
+    { from: 2002, to: 2004, name: 'New Orleans Hornets' },
+    { from: 2005, to: 2006, name: 'New Orleans/Oklahoma City Hornets' },
+    { from: 2007, to: 2012, name: 'New Orleans Hornets' },
+    { from: 2013,           name: 'New Orleans Pelicans' },
+  ],
+  'Oklahoma City Thunder': [
+    { from: 1967, to: 2007, name: 'Seattle SuperSonics' },
+    { from: 2008,           name: 'Oklahoma City Thunder' },
+  ],
+  'Philadelphia 76ers': [
+    { from: 1949, to: 1962, name: 'Syracuse Nationals' },
+    { from: 1963,           name: 'Philadelphia 76ers' },
+  ],
+  'Sacramento Kings': [
+    { from: 1948, to: 1956, name: 'Rochester Royals' },
+    { from: 1957, to: 1971, name: 'Cincinnati Royals' },
+    { from: 1972, to: 1974, name: 'Kansas City-Omaha Kings' },
+    { from: 1975, to: 1984, name: 'Kansas City Kings' },
+    { from: 1985,           name: 'Sacramento Kings' },
+  ],
+  'Utah Jazz': [
+    { from: 1974, to: 1978, name: 'New Orleans Jazz' },
+    { from: 1979,           name: 'Utah Jazz' },
+  ],
+  'Washington Wizards': [
+    { from: 1961, to: 1961, name: 'Chicago Packers' },
+    { from: 1962, to: 1962, name: 'Chicago Zephyrs' },
+    { from: 1963, to: 1972, name: 'Baltimore Bullets' },
+    { from: 1973, to: 1973, name: 'Capital Bullets' },
+    { from: 1974, to: 1996, name: 'Washington Bullets' },
+    { from: 1997,           name: 'Washington Wizards' },
+  ],
+};
+
+/**
+ * Returns the correct historical team name for a franchise in a given season.
+ * e.g. getHistoricalName('Oklahoma City Thunder', 2005) → 'Seattle SuperSonics'
+ */
+export function getHistoricalName(franchise, seasonYear) {
+  const history = FRANCHISE_NAME_HISTORY[franchise];
+  if (!history) return franchise;
+  for (const entry of history) {
+    if (seasonYear >= entry.from && (entry.to == null || seasonYear <= entry.to)) {
+      return entry.name;
+    }
+  }
+  return franchise;
+}
+
 export const FRANCHISE_STATS = {
   'Atlanta Hawks':           { winPct: '.493', playoffs: 49, confFinals: 14, finals: 4,  champs: 1  },
   'Boston Celtics':          { winPct: '.597', playoffs: 62, confFinals: 39, finals: 23, champs: 18 },

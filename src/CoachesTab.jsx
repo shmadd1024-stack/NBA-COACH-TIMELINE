@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { supabase } from './supabase';
-import { TEAM_COLORS, COACH_CHAMPS } from './constants';
+import { TEAM_COLORS, COACH_CHAMPS, getHistoricalName } from './constants';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -116,7 +116,7 @@ function CoachDetail({ coach, seasonData, loadingSeasons }) {
               return (
                 <tr key={i} style={{ borderBottom: '1px solid #f5f5f5' }}>
                   <td style={{ padding: '6px 8px', fontWeight: 700, color: TEAM_COLORS[s.franchise] || '#444', fontSize: 12 }}>
-                    {s.franchise}
+                    {getHistoricalName(s.franchise, s.start)}
                   </td>
                   <td style={{ padding: '6px 8px', textAlign: 'right', color: '#888', fontSize: 12 }}>{s.start}–{s.end}</td>
                   <td style={{ padding: '6px 8px', textAlign: 'right', color: '#2e7d32', fontWeight: 700 }}>{s.wins}</td>
@@ -211,7 +211,7 @@ function CoachDetail({ coach, seasonData, loadingSeasons }) {
                           {fmtSeason(row.season_year)}
                         </td>
                         <td style={{ padding: '5px 6px', color: TEAM_COLORS[row.franchise] || '#444', fontWeight: 600, fontSize: 11, whiteSpace: 'nowrap' }}>
-                          {shortName(row.franchise)}
+                          {getHistoricalName(row.franchise, row.season_year)}
                         </td>
                         <td style={{ padding: '5px 6px', textAlign: 'right', color: '#2e7d32', fontWeight: 700 }}>{row.wins ?? '—'}</td>
                         <td style={{ padding: '5px 6px', textAlign: 'right', color: '#c62828' }}>{row.losses ?? '—'}</td>
