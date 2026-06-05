@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { supabase } from './supabase';
 import { TEAM_COLORS, COACH_CHAMPS, COACH_FULL_NAMES } from './constants';
 
-// ── SVG layout ───────────────────────────────────────────────────────────────
+// ── SVG layout (scatter) ─────────────────────────────────────────────────────
 const SVG_W = 580, SVG_H = 460;
 const M = { top: 24, right: 28, bottom: 58, left: 62 };
 const PW = SVG_W - M.left - M.right;
@@ -23,7 +23,6 @@ const AXIS_OPTS = [
   { key: 'career',  label: 'Career Win%'     },
 ];
 
-// Abbreviated names of currently active coaches (from nbacoaches.com)
 const CURRENT_COACH_KEYS = new Set([
   'J. Mazzulla','J. Fernandez','M. Brown','N. Nurse','D. Rajakovic',
   'K. Atkinson','J. Bickerstaff','R. Carlisle','T. Jenkins',
@@ -130,6 +129,74 @@ function buildPoints(coachData, allSeasons, byStint) {
   });
 }
 
+// Build year-by-year series for the Timeline chart
+function buildTimelineSeries(addedIds, coachData, allSeasons, byStint) {
+  const result = [];
+
+  if (byStint) {
+    coachData.forEach(s => {
+      const id = `${s.coach}|${s.franchise}|${s.start}`;
+      if (!addedIds.has(id)) return;
+      const seasons = stintSeasons(s, allSeasons);
+      if (!seasons.length) return;
+      result.push({
+        id,
+        coach: s.coach,
+        label: `${s.franchise.replace('Los Angeles ', 'LA ')} ${s.start}–${s.end}`,
+        franchise: s.franchise,
+        color: TEAM_COLORS[s.franchise] || '#888',
+        rings: COACH_CHAMPS[s.coach] ?? 0,
+        isActive: s.is_active,
+        points: seasons.map((r, i) => ({
+          year: i + 1,
+          wp: wp(r.wins, r.losses),
+          wins: r.wins,
+          losses: r.losses,
+          seasonYear: r.season_year,
+        })),
+      });
+    });
+  } else {
+    const byCoach = {};
+    coachData.forEach(s => {
+      if (!byCoach[s.coach]) byCoach[s.coach] = [];
+      byCoach[s.coach].push(s);
+    });
+    Object.entries(byCoach).forEach(([coach, stints]) => {
+      if (!addedIds.has(coach)) return;
+      stints.sort((a, b) => a.start - b.start);
+      const allS = stints
+        .flatMap(s => stintSeasons(s, allSeasons))
+        .sort((a, b) => a.season_year - b.season_year);
+      if (!allS.length) return;
+      const primary = [...stints].sort((a, b) => (b.end - b.start) - (a.end - a.start))[0];
+      const isActive = stints.some(s => s.is_active);
+      const activeFranchise = stints.find(s => s.is_active)?.franchise;
+      const labelFranchise = (isActive ? activeFranchise : primary.franchise) || primary.franchise;
+      const uniqueTeams = new Set(stints.map(s => s.franchise)).size;
+      const teamSuffix = uniqueTeams > 1 ? ` · ${uniqueTeams} teams` : '';
+      result.push({
+        id: coach,
+        coach,
+        label: labelFranchise.replace('Los Angeles ', 'LA ') + teamSuffix,
+        franchise: primary.franchise,
+        color: TEAM_COLORS[primary.franchise] || '#888',
+        rings: COACH_CHAMPS[coach] ?? 0,
+        isActive,
+        points: allS.map((r, i) => ({
+          year: i + 1,
+          wp: wp(r.wins, r.losses),
+          wins: r.wins,
+          losses: r.losses,
+          seasonYear: r.season_year,
+        })),
+      });
+    });
+  }
+
+  return result;
+}
+
 // ── ScatterPlot ───────────────────────────────────────────────────────────────
 
 function ScatterPlot({ points, xKey, yKey, xLabel, yLabel, onRemove }) {
@@ -214,11 +281,11 @@ function ScatterPlot({ points, xKey, yKey, xLabel, yLabel, onRemove }) {
           const cx   = px(hovered[xKey]);
           const cy   = py(hovered[yKey]);
           const TW   = 185, TH = 88;
-          const tx   = cx + 16 + TW > PW ? cx - TW - 10 : cx + 16;
-          const ty   = Math.max(0, Math.min(cy - TH / 2, PH - TH));
+          const ttx  = cx + 16 + TW > PW ? cx - TW - 10 : cx + 16;
+          const tty  = Math.max(0, Math.min(cy - TH / 2, PH - TH));
           const full = COACH_FULL_NAMES[hovered.coach] || hovered.coach;
           return (
-            <g transform={`translate(${tx},${ty})`} pointerEvents="none">
+            <g transform={`translate(${ttx},${tty})`} pointerEvents="none">
               <rect width={TW} height={TH} rx={7} fill="rgba(18,18,36,0.93)" />
               <text x={10} y={20} fontSize={13} fontWeight={800} fill="#fff">
                 {full}{hovered.rings > 0 ? ' 🏆' : ''}
@@ -237,6 +304,161 @@ function ScatterPlot({ points, xKey, yKey, xLabel, yLabel, onRemove }) {
               <text x={TW - 10} y={82} fontSize={9} fill="#555" fontStyle="italic" textAnchor="end"
                 onClick={() => onRemove(hovered.id)} style={{ cursor: 'pointer' }}>
                 Remove ×
+              </text>
+            </g>
+          );
+        })()}
+      </g>
+    </svg>
+  );
+}
+
+// ── TimelineChart ─────────────────────────────────────────────────────────────
+
+const TL_M = { top: 24, right: 90, bottom: 58, left: 62 };
+const TL_PW = SVG_W - TL_M.left - TL_M.right;
+const TL_PH = SVG_H - TL_M.top - TL_M.bottom;
+
+function tlPy(p) { return TL_PH - ((p - P0) / (P1 - P0)) * TL_PH; }
+
+function TimelineChart({ series, lineStyle, onRemove }) {
+  const [hovered, setHovered] = useState(null);
+
+  const maxYear = series.length
+    ? Math.max(...series.flatMap(s => s.points.map(p => p.year)))
+    : 10;
+
+  function yearX(yr) {
+    if (maxYear === 1) return TL_PW / 2;
+    return ((yr - 1) / (maxYear - 1)) * TL_PW;
+  }
+
+  const showLine = lineStyle === 'line' || lineStyle === 'both';
+  const showDots = lineStyle === 'dots' || lineStyle === 'both';
+
+  const step = maxYear <= 8 ? 1 : maxYear <= 16 ? 2 : 5;
+  const xLabels = Array.from({ length: maxYear }, (_, i) => i + 1)
+    .filter(yr => yr === 1 || yr === maxYear || yr % step === 0);
+
+  return (
+    <svg
+      width={SVG_W} height={SVG_H}
+      style={{ display: 'block', maxWidth: '100%', fontFamily: "'Barlow Condensed', sans-serif" }}
+    >
+      <g transform={`translate(${TL_M.left},${TL_M.top})`}>
+
+        {/* Y grid */}
+        {TICKS.map(t => (
+          <line key={t} x1={0} y1={tlPy(t)} x2={TL_PW} y2={tlPy(t)} stroke="#f0f0f0" strokeWidth={1} />
+        ))}
+
+        {/* 0.500 reference */}
+        <line x1={0} y1={tlPy(0.5)} x2={TL_PW} y2={tlPy(0.5)}
+          stroke="#ddd" strokeWidth={1.5} strokeDasharray="5 4" />
+
+        {/* Axes */}
+        <line x1={0} y1={TL_PH} x2={TL_PW} y2={TL_PH} stroke="#ccc" strokeWidth={1.5} />
+        <line x1={0} y1={0} x2={0} y2={TL_PH} stroke="#ccc" strokeWidth={1.5} />
+
+        {/* Y ticks */}
+        {TICKS.map(t => (
+          <text key={t} x={-8} y={tlPy(t) + 4} textAnchor="end" fontSize={10} fill="#bbb">
+            {Math.round(t * 100)}%
+          </text>
+        ))}
+
+        {/* X ticks */}
+        {xLabels.map(yr => (
+          <text key={yr} x={yearX(yr)} y={TL_PH + 17} textAnchor="middle" fontSize={10} fill="#bbb">
+            {yr === 1 ? 'Yr 1' : `Yr ${yr}`}
+          </text>
+        ))}
+
+        {/* Axis labels */}
+        <text x={TL_PW / 2} y={TL_PH + 44} textAnchor="middle" fontSize={11} fontWeight={700} fill="#888" letterSpacing="0.5">
+          YEAR OF TENURE
+        </text>
+        <text transform={`translate(-48,${TL_PH / 2}) rotate(-90)`} textAnchor="middle" fontSize={11} fontWeight={700} fill="#888" letterSpacing="0.5">
+          WIN %
+        </text>
+
+        {/* Empty state */}
+        {series.length === 0 && (
+          <text x={TL_PW / 2} y={TL_PH / 2} textAnchor="middle" fontSize={14} fill="#ccc" fontWeight={600}>
+            Search for coaches above to start comparing
+          </text>
+        )}
+
+        {/* Series */}
+        {series.map(s => {
+          const pts = s.points.filter(p => p.wp != null);
+          return (
+            <g key={s.id}>
+              {showLine && pts.length > 1 && (
+                <polyline
+                  points={pts.map(p => `${yearX(p.year)},${tlPy(p.wp)}`).join(' ')}
+                  fill="none" stroke={s.color} strokeWidth={2.5} opacity={0.75}
+                  strokeLinejoin="round" strokeLinecap="round"
+                />
+              )}
+              {pts.map(p => (
+                <circle
+                  key={p.year}
+                  cx={yearX(p.year)} cy={tlPy(p.wp)}
+                  r={showDots ? 5 : 7}
+                  fill={showDots ? s.color : 'transparent'}
+                  stroke={showDots ? '#fff' : 'transparent'}
+                  strokeWidth={showDots ? 1.5 : 0}
+                  onMouseEnter={() => setHovered({ s, p })}
+                  onMouseLeave={() => setHovered(v => (v?.s.id === s.id && v?.p.year === p.year) ? null : v)}
+                  style={{ cursor: 'default' }}
+                />
+              ))}
+            </g>
+          );
+        })}
+
+        {/* End-of-line labels */}
+        {series.map(s => {
+          const pts = s.points.filter(p => p.wp != null);
+          if (!pts.length) return null;
+          const last = pts.at(-1);
+          return (
+            <text key={s.id}
+              x={yearX(last.year) + 8} y={tlPy(last.wp) + 4}
+              fontSize={10} fill={s.color} fontWeight={700}
+              style={{ pointerEvents: 'none' }}
+            >
+              {(COACH_FULL_NAMES[s.coach] || s.coach).split(' ').pop()}
+            </text>
+          );
+        })}
+
+        {/* Tooltip */}
+        {hovered && (() => {
+          const { s, p } = hovered;
+          const cx = yearX(p.year), cy = tlPy(p.wp);
+          const TW = 195, TH = 82;
+          const ttx = cx + 14 + TW > TL_PW ? cx - TW - 10 : cx + 14;
+          const tty = Math.max(0, Math.min(cy - TH / 2, TL_PH - TH));
+          const full = COACH_FULL_NAMES[s.coach] || s.coach;
+          return (
+            <g transform={`translate(${ttx},${tty})`} pointerEvents="none">
+              <rect width={TW} height={TH} rx={7} fill="rgba(18,18,36,0.93)" />
+              <text x={10} y={20} fontSize={13} fontWeight={800} fill="#fff">
+                {full}{s.rings > 0 ? ' 🏆' : ''}
+              </text>
+              <text x={10} y={34} fontSize={10} fill="#999">
+                {s.label}
+              </text>
+              <text x={10} y={51} fontSize={12} fill="#ddd">
+                Year {p.year}{'  '}
+                <tspan fontWeight={800}>{fmtP(p.wp)}</tspan>
+                {'  '}
+                <tspan fill="#aaa" fontSize={10}>{p.wins}–{p.losses}</tspan>
+              </text>
+              <text x={10} y={67} fontSize={10} fill="#777">
+                {p.seasonYear}–{p.seasonYear + 1} season
               </text>
             </g>
           );
@@ -335,6 +557,8 @@ export default function PerformanceTab({ coachData }) {
   const [yKey,        setYKey]        = useState('finalYr');
   const [byStint,     setByStint]     = useState(false);
   const [view,        setView]        = useState('graph');
+  const [chartMode,   setChartMode]   = useState('scatter');
+  const [lineStyle,   setLineStyle]   = useState('both');
   const [addedIds,    setAddedIds]    = useState(new Set());
   const [sortCol,     setSortCol]     = useState('career');
   const [sortAsc,     setSortAsc]     = useState(false);
@@ -349,19 +573,22 @@ export default function PerformanceTab({ coachData }) {
     });
   }, []);
 
-  // All computed points (no active/season filters — search should see everything)
   const allPoints = useMemo(() => {
     if (!allSeasons.length) return [];
     return buildPoints(coachData, allSeasons, byStint);
   }, [coachData, allSeasons, byStint]);
 
-  // Only the coaches the user has added
   const addedPoints = useMemo(
     () => allPoints.filter(p => addedIds.has(p.id)),
     [allPoints, addedIds]
   );
 
-  const addCoach   = id => setAddedIds(prev => new Set([...prev, id]));
+  const timelineSeries = useMemo(() => {
+    if (!allSeasons.length || !addedIds.size) return [];
+    return buildTimelineSeries(addedIds, coachData, allSeasons, byStint);
+  }, [addedIds, coachData, allSeasons, byStint]);
+
+  const addCoach    = id => setAddedIds(prev => new Set([...prev, id]));
   const removeCoach = id => setAddedIds(prev => { const n = new Set(prev); n.delete(id); return n; });
 
   const addCurrentCoaches = () => {
@@ -412,13 +639,11 @@ export default function PerformanceTab({ coachData }) {
   return (
     <div style={{ fontFamily: "'Barlow Condensed', sans-serif", padding: '14px 20px' }}>
 
-      {/* ── Top controls ── */}
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
+      {/* ── Row 1: search + view controls ── */}
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 10 }}>
 
-        {/* Search */}
         <CoachSearch allPoints={allPoints} addedIds={addedIds} onAdd={addCoach} />
 
-        {/* Preset */}
         <button onClick={addCurrentCoaches} style={{
           background: '#e8f5e9', color: '#2e7d32', border: '1.5px solid #a5d6a7',
           padding: '6px 14px', borderRadius: 20, cursor: 'pointer',
@@ -445,12 +670,45 @@ export default function PerformanceTab({ coachData }) {
 
         <div style={{ display: 'flex', gap: 4 }}>
           <span style={lbl}>BY</span>
-          {pill(!byStint, () => setByStint(false), 'Career')}
+          {pill(!byStint, () => setByStint(false), 'Coach')}
           {pill( byStint, () => setByStint(true),  'Stint')}
         </div>
       </div>
 
-      {/* ── Added coach chips ── */}
+      {/* ── Row 2: chart-mode controls (graph only) ── */}
+      {view === 'graph' && (
+        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center', marginBottom: 10 }}>
+          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+            <span style={lbl}>CHART</span>
+            {pill(chartMode === 'scatter',  () => setChartMode('scatter'),  'Scatter')}
+            {pill(chartMode === 'timeline', () => setChartMode('timeline'), 'Year by Year')}
+          </div>
+
+          {chartMode === 'scatter' && (
+            <>
+              <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                <span style={lbl}>X AXIS</span>
+                {AXIS_OPTS.map(o => pill(xKey === o.key, () => setXKey(o.key), o.label))}
+              </div>
+              <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                <span style={lbl}>Y AXIS</span>
+                {AXIS_OPTS.map(o => pill(yKey === o.key, () => setYKey(o.key), o.label))}
+              </div>
+            </>
+          )}
+
+          {chartMode === 'timeline' && (
+            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+              <span style={lbl}>STYLE</span>
+              {pill(lineStyle === 'both', () => setLineStyle('both'), 'Line + Dots')}
+              {pill(lineStyle === 'line', () => setLineStyle('line'), 'Line')}
+              {pill(lineStyle === 'dots', () => setLineStyle('dots'), 'Dots')}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Coach chips ── */}
       {addedPoints.length > 0 && (
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
           {addedPoints.map(p => (
@@ -471,42 +729,51 @@ export default function PerformanceTab({ coachData }) {
         </div>
       )}
 
-      {view === 'graph' && (
-        <>
-          {/* Axis selectors */}
-          <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginBottom: 12 }}>
-            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-              <span style={lbl}>X AXIS</span>
-              {AXIS_OPTS.map(o => pill(xKey === o.key, () => setXKey(o.key), o.label))}
+      {/* ── Graph view ── */}
+      {view === 'graph' && chartMode === 'scatter' && (
+        <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+          <ScatterPlot
+            points={addedPoints}
+            xKey={xKey} yKey={yKey}
+            xLabel={xLabel} yLabel={yLabel}
+            onRemove={removeCoach}
+          />
+          <div style={{ paddingTop: 28, fontSize: 11, color: '#aaa', lineHeight: 1.9, minWidth: 130 }}>
+            <div style={{ fontWeight: 700, color: '#444', fontSize: 13, marginBottom: 6 }}>
+              {addedPoints.filter(p => p[xKey] != null && p[yKey] != null).length} plotted
             </div>
-            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-              <span style={lbl}>Y AXIS</span>
-              {AXIS_OPTS.map(o => pill(yKey === o.key, () => setYKey(o.key), o.label))}
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-            <ScatterPlot
-              points={addedPoints}
-              xKey={xKey} yKey={yKey}
-              xLabel={xLabel} yLabel={yLabel}
-              onRemove={removeCoach}
-            />
-            <div style={{ paddingTop: 28, fontSize: 11, color: '#aaa', lineHeight: 1.9, minWidth: 130 }}>
-              <div style={{ fontWeight: 700, color: '#444', fontSize: 13, marginBottom: 6 }}>
-                {addedPoints.filter(p => p[xKey] != null && p[yKey] != null).length} plotted
-              </div>
-              <div>Dot size ∝ wins</div>
-              <div>🏆 = championship</div>
-              <div style={{ marginBottom: 10 }}>Hover for stats</div>
-              <div style={{ borderTop: '1px solid #eee', paddingTop: 8, fontSize: 10 }}>
-                Dashed = equal<br />Above = Y &gt; X
-              </div>
+            <div>Dot size ∝ wins</div>
+            <div>🏆 = championship</div>
+            <div style={{ marginBottom: 10 }}>Hover for stats</div>
+            <div style={{ borderTop: '1px solid #eee', paddingTop: 8, fontSize: 10 }}>
+              Dashed = equal<br />Above = Y &gt; X
             </div>
           </div>
-        </>
+        </div>
       )}
 
+      {view === 'graph' && chartMode === 'timeline' && (
+        <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+          <TimelineChart
+            series={timelineSeries}
+            lineStyle={lineStyle}
+            onRemove={removeCoach}
+          />
+          <div style={{ paddingTop: 28, fontSize: 11, color: '#aaa', lineHeight: 1.9, minWidth: 130 }}>
+            <div style={{ fontWeight: 700, color: '#444', fontSize: 13, marginBottom: 6 }}>
+              {timelineSeries.length} coaches
+            </div>
+            <div>Year 1 = first season</div>
+            <div>🏆 = championship</div>
+            <div style={{ marginBottom: 10 }}>Hover a point for stats</div>
+            <div style={{ borderTop: '1px solid #eee', paddingTop: 8, fontSize: 10 }}>
+              Dashed = .500<br />Above = winning record
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Table view ── */}
       {view === 'table' && (
         <div style={{ overflowX: 'auto' }}>
           {addedPoints.length === 0 ? (
