@@ -28,9 +28,9 @@ const CURRENT_COACH_KEYS = new Set([
   'J. Mazzulla','J. Fernandez','M. Brown','N. Nurse','D. Rajakovic',
   'K. Atkinson','J. Bickerstaff','R. Carlisle','T. Jenkins',
   'Q. Snyder','C. Lee','E. Spoelstra','B. Keefe',
-  'D. Adelman','C. Finch','M. Daigneault','C. Billups','W. Hardy',
+  'D. Adelman','C. Finch','M. Daigneault','T. Splitter','W. Hardy',
   'S. Kerr','T. Lue','J. Redick','J. Ott','D. Christie',
-  'I. Udoka','T. Iisalo',
+  'I. Udoka','T. Iisalo','M. Johnson','J. Mosley',
 ]);
 
 // ── data helpers ─────────────────────────────────────────────────────────────
@@ -105,10 +105,15 @@ function buildPoints(coachData, allSeasons, byStint) {
     const totalW = stints.reduce((a, s) => a + s.wins, 0);
     const totalL = stints.reduce((a, s) => a + s.losses, 0);
     const primary = [...stints].sort((a, b) => (b.end - b.start) - (a.end - a.start))[0];
+    const isActive = stints.some(s => s.is_active);
+    const activeFranchise = stints.find(s => s.is_active)?.franchise;
+    const labelFranchise = (isActive ? activeFranchise : primary.franchise) || primary.franchise;
+    const uniqueTeams = new Set(stints.map(s => s.franchise)).size;
+    const teamSuffix = uniqueTeams > 1 ? ` · ${uniqueTeams} teams` : '';
     return [{
       id:       coach,
       coach,
-      label:    stints.length === 1 ? stints[0].franchise.replace('Los Angeles ', 'LA ') : `${stints.length} teams`,
+      label:    labelFranchise.replace('Los Angeles ', 'LA ') + teamSuffix,
       franchise: primary.franchise,
       start:    stints[0].start,
       end:      stints.at(-1).end,
@@ -457,7 +462,6 @@ export default function PerformanceTab({ coachData }) {
             }}>
               {(COACH_FULL_NAMES[p.coach] || p.coach).split(' ').pop()}
               {p.rings > 0 ? ' 🏆' : ''}
-              {p.isActive ? <span style={{ fontSize: 9, background: '#e8f5e9', color: '#2e7d32', padding: '1px 4px', borderRadius: 5 }}>NOW</span> : null}
               <span
                 onMouseDown={() => removeCoach(p.id)}
                 style={{ fontSize: 14, lineHeight: 1, color: '#aaa', cursor: 'pointer', marginLeft: 1 }}
@@ -528,7 +532,7 @@ export default function PerformanceTab({ coachData }) {
                     ].map(([h, col]) => (
                       <th key={h + (col || '')} onClick={col ? () => toggleSort(col) : undefined} style={{
                         padding: '6px 10px',
-                        textAlign: !col && h !== '#' ? 'left' : 'right',
+                        textAlign: (h === 'COACH' || h === 'TEAM / STINTS') ? 'left' : 'right',
                         fontSize: 9, fontWeight: 700,
                         color: sortCol === col ? '#1a1a2e' : '#bbb',
                         letterSpacing: '0.6px',
