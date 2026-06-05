@@ -4,6 +4,7 @@ export const MIN_YEAR = 1946;
 export const MAX_YEAR = 2026;
 
 export const TEAM_COLORS = {
+  // ── Current franchises ──────────────────────────────────────────────────────
   'Atlanta Hawks': '#E03A3E', 'Boston Celtics': '#007A33', 'Brooklyn Nets': '#444444',
   'Charlotte Hornets': '#1D1160', 'Chicago Bulls': '#CE1141', 'Cleveland Cavaliers': '#860038',
   'Dallas Mavericks': '#00538C', 'Denver Nuggets': '#0E2240', 'Detroit Pistons': '#C8102E',
@@ -14,6 +15,50 @@ export const TEAM_COLORS = {
   'Orlando Magic': '#0077C0', 'Philadelphia 76ers': '#006BB6', 'Phoenix Suns': '#1D1160',
   'Portland Trail Blazers': '#E03A3E', 'Sacramento Kings': '#5A2D81', 'San Antonio Spurs': '#333333',
   'Toronto Raptors': '#CE1141', 'Utah Jazz': '#002B5C', 'Washington Wizards': '#002B5C',
+  // ── Atlanta Hawks lineage ────────────────────────────────────────────────────
+  'Tri-Cities Blackhawks': '#C8102E',
+  'Milwaukee Hawks':       '#C8102E',
+  'St. Louis Hawks':       '#C8102E',
+  // ── Brooklyn Nets lineage ────────────────────────────────────────────────────
+  'New York Nets':    '#444444',
+  'New Jersey Nets':  '#003DA5',
+  // ── Charlotte Hornets (Bobcats) lineage ──────────────────────────────────────
+  'Charlotte Bobcats': '#1D428A',
+  // ── Detroit Pistons lineage ──────────────────────────────────────────────────
+  'Fort Wayne Pistons': '#C8102E',
+  // ── Golden State Warriors lineage ────────────────────────────────────────────
+  'Philadelphia Warriors': '#006BB6',
+  'San Francisco Warriors': '#006BB6',
+  // ── Houston Rockets lineage ──────────────────────────────────────────────────
+  'San Diego Rockets': '#CE1141',
+  // ── LA Clippers lineage ──────────────────────────────────────────────────────
+  'Buffalo Braves':    '#003DA5',
+  'San Diego Clippers': '#C8102E',
+  // ── LA Lakers lineage ────────────────────────────────────────────────────────
+  'Minneapolis Lakers': '#552583',
+  // ── Memphis Grizzlies lineage ────────────────────────────────────────────────
+  'Vancouver Grizzlies': '#00B2A9',
+  // ── New Orleans Pelicans lineage (original Charlotte Hornets) ────────────────
+  'Charlotte Hornets (1988)':           '#00778B', // original Charlotte Hornets (NOH lineage)
+  'New Orleans Hornets':                '#00778B',
+  'New Orleans/Oklahoma City Hornets':  '#00778B',
+  // ── Oklahoma City Thunder lineage ────────────────────────────────────────────
+  'Seattle SuperSonics': '#00653A',
+  // ── Philadelphia 76ers lineage ───────────────────────────────────────────────
+  'Syracuse Nationals': '#CE1141',
+  // ── Sacramento Kings lineage ─────────────────────────────────────────────────
+  'Rochester Royals':       '#5A2D81',
+  'Cincinnati Royals':      '#5A2D81',
+  'Kansas City-Omaha Kings': '#5A2D81',
+  'Kansas City Kings':       '#5A2D81',
+  // ── Utah Jazz lineage ────────────────────────────────────────────────────────
+  'New Orleans Jazz': '#4B2683',
+  // ── Washington Wizards lineage ───────────────────────────────────────────────
+  'Chicago Packers':   '#CE1141',
+  'Chicago Zephyrs':   '#CE1141',
+  'Baltimore Bullets': '#CE1141',
+  'Capital Bullets':   '#CE1141',
+  'Washington Bullets': '#002B5C',
 };
 
 export const TEAM_ACCENT = {
@@ -160,7 +205,8 @@ export const FRANCHISE_NAME_HISTORY = {
   ],
   'New Orleans Pelicans': [
     // Original Charlotte Hornets franchise that relocated
-    { from: 1988, to: 2001, name: 'Charlotte Hornets' },
+    // Use a distinct key so color lookup doesn't hit the Bobcats-lineage navy
+    { from: 1988, to: 2001, name: 'Charlotte Hornets (1988)' },
     { from: 2002, to: 2004, name: 'New Orleans Hornets' },
     { from: 2005, to: 2006, name: 'New Orleans/Oklahoma City Hornets' },
     { from: 2007, to: 2012, name: 'New Orleans Hornets' },

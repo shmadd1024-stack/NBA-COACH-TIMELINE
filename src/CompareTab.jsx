@@ -164,7 +164,7 @@ function StintsTable({ stats, accent }) {
           const wp  = tot > 0 ? (s.wins / tot * 100).toFixed(1) + '%' : '—';
           return (
             <tr key={i} style={{ borderBottom: '1px solid #f5f5f5' }}>
-              <td style={{ padding: '5px 6px', color: TEAM_COLORS[s.franchise] || '#444', fontWeight: 600, fontSize: 11 }}>
+              <td style={{ padding: '5px 6px', color: TEAM_COLORS[getHistoricalName(s.franchise, s.start)] || '#444', fontWeight: 600, fontSize: 11 }}>
                 {getHistoricalName(s.franchise, s.start)}
               </td>
               <td style={{ padding: '5px 6px', textAlign: 'right', color: '#999' }}>{s.end - s.start}</td>

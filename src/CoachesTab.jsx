@@ -115,7 +115,7 @@ function CoachDetail({ coach, seasonData, loadingSeasons }) {
               const wp  = tot > 0 ? (s.wins / tot * 100).toFixed(1) : '—';
               return (
                 <tr key={i} style={{ borderBottom: '1px solid #f5f5f5' }}>
-                  <td style={{ padding: '6px 8px', fontWeight: 700, color: TEAM_COLORS[s.franchise] || '#444', fontSize: 12 }}>
+                  <td style={{ padding: '6px 8px', fontWeight: 700, color: TEAM_COLORS[getHistoricalName(s.franchise, s.start)] || '#444', fontSize: 12 }}>
                     {getHistoricalName(s.franchise, s.start)}
                   </td>
                   <td style={{ padding: '6px 8px', textAlign: 'right', color: '#888', fontSize: 12 }}>{s.start}–{s.end}</td>
@@ -210,7 +210,7 @@ function CoachDetail({ coach, seasonData, loadingSeasons }) {
                         <td style={{ padding: '5px 6px', color: '#666', fontWeight: 600, whiteSpace: 'nowrap' }}>
                           {fmtSeason(row.season_year)}
                         </td>
-                        <td style={{ padding: '5px 6px', color: TEAM_COLORS[row.franchise] || '#444', fontWeight: 600, fontSize: 11, whiteSpace: 'nowrap' }}>
+                        <td style={{ padding: '5px 6px', color: TEAM_COLORS[getHistoricalName(row.franchise, row.season_year)] || '#444', fontWeight: 600, fontSize: 11, whiteSpace: 'nowrap' }}>
                           {getHistoricalName(row.franchise, row.season_year)}
                         </td>
                         <td style={{ padding: '5px 6px', textAlign: 'right', color: '#2e7d32', fontWeight: 700 }}>{row.wins ?? '—'}</td>
