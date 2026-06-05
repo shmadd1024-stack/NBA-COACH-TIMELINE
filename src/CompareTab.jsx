@@ -148,12 +148,18 @@ function StatRow({ label, val1, val2, fmt, higherIsBetter = true }) {
 
 // ─── StintsTable ─────────────────────────────────────────────────────────────
 
+function stintSeason(s) {
+  if (s.is_active) return `${s.start}-Present`;
+  return `${s.start}-${String(s.end).slice(-2)}`;
+}
+
 function StintsTable({ stats, accent }) {
+  const sorted = [...stats.stints].sort((a, b) => a.start - b.start);
   return (
     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
       <thead>
         <tr style={{ borderBottom: `2px solid ${accent}` }}>
-          {['FRANCHISE','YRS','W','L','WIN%'].map(h => (
+          {['FRANCHISE','SEASONS','W','L','WIN%'].map(h => (
             <th key={h} style={{
               textAlign: h === 'FRANCHISE' ? 'left' : 'right',
               padding: '4px 6px', fontSize: 9, fontWeight: 700, color: accent, letterSpacing: '0.5px',
@@ -162,7 +168,7 @@ function StintsTable({ stats, accent }) {
         </tr>
       </thead>
       <tbody>
-        {stats.stints.map((s, i) => {
+        {sorted.map((s, i) => {
           const tot = s.wins + s.losses;
           const wp  = tot > 0 ? (s.wins / tot * 100).toFixed(1) + '%' : '—';
           return (
@@ -170,7 +176,7 @@ function StintsTable({ stats, accent }) {
               <td style={{ padding: '5px 6px', color: TEAM_COLORS[getHistoricalName(s.franchise, s.start)] || '#444', fontWeight: 600, fontSize: 11 }}>
                 {getHistoricalName(s.franchise, s.start)}
               </td>
-              <td style={{ padding: '5px 6px', textAlign: 'right', color: '#999' }}>{s.end - s.start}</td>
+              <td style={{ padding: '5px 6px', textAlign: 'right', color: '#999' }}>{stintSeason(s)}</td>
               <td style={{ padding: '5px 6px', textAlign: 'right', color: '#2e7d32', fontWeight: 700 }}>{s.wins}</td>
               <td style={{ padding: '5px 6px', textAlign: 'right', color: '#c62828' }}>{s.losses}</td>
               <td style={{ padding: '5px 6px', textAlign: 'right', color: '#555', fontWeight: 600 }}>{wp}</td>

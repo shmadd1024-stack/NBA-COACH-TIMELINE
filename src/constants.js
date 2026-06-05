@@ -324,7 +324,7 @@ export const COACH_FULL_NAMES = {
   'M. Cheeks': 'Maurice Cheeks', 'M. Curry': 'Michael Curry', "M. D'Antoni": "Mike D'Antoni",
   'M. Daigneault': 'Mark Daigneault', 'M. Dunlap': 'Mike Dunlap', 'M. Dunleavy': 'Mike Dunleavy',
   'M. Fratello': 'Mike Fratello', 'M. Guokas': 'Matt Guokas', 'M. Iavaroni': 'Marc Iavaroni',
-  'M. Jackson': 'Mark Jackson', 'M. Malone': 'Mike Malone', 'M. Montgomery': 'Mike Montgomery',
+  'M. Jackson': 'Mark Jackson', 'M. Johnson': 'Mitch Johnson', 'M. Malone': 'Mike Malone', 'M. Montgomery': 'Mike Montgomery',
   'M. Schuler': 'Mike Schuler', 'M. Williams': 'Monty Williams', 'M. Woodson': 'Mike Woodson',
   'M. Zaslofsky': 'Max Zaslofsky',
   'N. Bjorkgren': 'Nate Bjorkgren', 'N. Cohalan': 'Neil Cohalan', 'N. Johnston': 'Neil Johnston',
