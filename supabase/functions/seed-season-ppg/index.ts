@@ -76,9 +76,15 @@ const HEADERS = {
 
 /**
  * Parse a per-game stats table from BBRef HTML.
+ * statName: 'pts' for the team table, 'opp_pts' for the opponent table.
  * Returns Map<abbrev, ppg> for each team row found.
+ *
+ * BBRef row format (team column):
+ *   <td data-stat="team" ><a href='/teams/MIL/2021.html'>Milwaukee Bucks</a>*</td>
+ * Points column:
+ *   <td data-stat="pts" >120.1</td>
  */
-function parseTable(html: string, tableId: string): Map<string, number> {
+function parseTable(html: string, tableId: string, statName: string): Map<string, number> {
   const result = new Map<string, number>();
   const start = html.indexOf(`id="${tableId}"`);
   if (start === -1) return result;
@@ -86,9 +92,10 @@ function parseTable(html: string, tableId: string): Map<string, number> {
   const block = end >= 0 ? html.slice(start, end) : html.slice(start, start + 60_000);
 
   for (const row of block.split(/<tr[^>]*>/)) {
-    const abbM = row.match(/data-stat="team_id"[^>]*>(?:<a[^>]*>)?([A-Z]{2,3})(?:<\/a>)?</);
+    // BBRef uses single-quoted href: href='/teams/ABC/2021.html'
+    const abbM = row.match(/data-stat="team"[^>]*><a[^>]*href='[^']*?\/teams\/([A-Z]{2,3})\//);
     if (!abbM) continue;
-    const ptsM = row.match(/data-stat="pts_per_g"[^>]*>([\d.]+)</);
+    const ptsM = row.match(new RegExp(`data-stat="${statName}"[^>]*>([\\d.]+)<`));
     if (!ptsM) continue;
     result.set(abbM[1], parseFloat(ptsM[1]));
   }
@@ -103,7 +110,7 @@ function parseTable(html: string, tableId: string): Map<string, number> {
 async function fetchLeagueYear(
   endYear: number,
 ): Promise<Map<string, { ptsFor: number; ptsAgainst: number | null }>> {
-  const url = `https://www.basketball-reference.com/leagues/NBA_${endYear}_per_game.html`;
+  const url = `https://www.basketball-reference.com/leagues/NBA_${endYear}.html`;
   const res = await fetch(url, { headers: HEADERS });
   if (res.status === 404) return new Map(); // pre-coverage seasons
   if (!res.ok) throw new Error(`HTTP ${res.status} for ${endYear}`);
@@ -112,8 +119,8 @@ async function fetchLeagueYear(
   // BBRef hides some tables inside HTML comments; strip the comment wrappers.
   const html = raw.replace(/<!--([\s\S]*?)-->/g, '$1');
 
-  const teamPPG = parseTable(html, 'per_game-team');
-  const oppPPG  = parseTable(html, 'per_game-opponent');
+  const teamPPG = parseTable(html, 'per_game-team',     'pts');
+  const oppPPG  = parseTable(html, 'per_game-opponent', 'opp_pts');
 
   const out = new Map<string, { ptsFor: number; ptsAgainst: number | null }>();
   for (const [abbrev, ptsFor] of teamPPG) {
