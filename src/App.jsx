@@ -90,7 +90,7 @@ function YearRangeSlider({ min, max, start, end, onChange }) {
 export default function App() {
   const [coachData,        setCoachData]        = useState([]);
   const [loading,          setLoading]          = useState(true);
-  const [activeTab,        setActiveTab]        = useState('timeline');
+  const [activeTab,        setActiveTab]        = useState('coaches');
   const [tooltip,          setTooltip]          = useState(null);
   const [franchiseTip,     setFranchiseTip]     = useState(null);
   const [search,           setSearch]           = useState('');
@@ -165,9 +165,9 @@ export default function App() {
   for (let yr = Math.ceil(viewStart / 10) * 10; yr <= viewEnd; yr += 10) decadeTicks.push(yr);
 
   const TABS = [
-    ['timeline', '📊 Timeline'],
     ['coaches',  '👤 Coach Stats'],
     ['compare',  '⚡ Compare'],
+    ['timeline', '📊 Timeline'],
   ];
 
   return (

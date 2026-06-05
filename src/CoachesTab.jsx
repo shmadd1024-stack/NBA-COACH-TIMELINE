@@ -42,8 +42,14 @@ function shortName(franchise) {
 
 function CoachDetail({ coach, seasonData, loadingSeasons }) {
   const color   = TEAM_COLORS[coach.teams[0]] || '#444';
-  const avgOrtg = seasonData.length ? (seasonData.reduce((s, r) => s + (r.ortg ?? 0), 0) / seasonData.filter(r => r.ortg != null).length) : null;
-  const avgDrtg = seasonData.length ? (seasonData.reduce((s, r) => s + (r.drtg ?? 0), 0) / seasonData.filter(r => r.drtg != null).length) : null;
+
+  const rtgRows = seasonData.filter(r => r.ortg != null);
+  const avgOrtg = rtgRows.length ? rtgRows.reduce((s, r) => s + r.ortg, 0) / rtgRows.length : null;
+  const avgDrtg = rtgRows.length ? rtgRows.reduce((s, r) => s + r.drtg, 0) / rtgRows.length : null;
+
+  const ppgRows    = seasonData.filter(r => r.pts_for != null);
+  const avgPtsFor  = ppgRows.length ? ppgRows.reduce((s, r) => s + r.pts_for,     0) / ppgRows.length : null;
+  const avgPtsAgainst = ppgRows.length ? ppgRows.reduce((s, r) => s + r.pts_against, 0) / ppgRows.length : null;
 
   return (
     <div style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
@@ -123,14 +129,14 @@ function CoachDetail({ coach, seasonData, loadingSeasons }) {
         </table>
       </div>
 
-      {/* ── Season-by-season ratings ── */}
+      {/* ── Season-by-season stats ── */}
       <div style={{ padding: '16px 28px 24px' }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: '#bbb', letterSpacing: '0.8px' }}>
-            SEASON-BY-SEASON RATINGS
+            SEASON-BY-SEASON STATS
           </div>
           <div style={{ fontSize: 10, color: '#ccc' }}>
-            per 100 possessions · Basketball Reference
+            Pts/G &amp; Opp/G = raw per game · Off/Def Rtg = per 100 possessions · Basketball Reference
           </div>
         </div>
 
@@ -138,66 +144,105 @@ function CoachDetail({ coach, seasonData, loadingSeasons }) {
           <div style={{ color: '#bbb', fontSize: 14, padding: '12px 0' }}>Loading…</div>
         ) : seasonData.length === 0 ? (
           <div style={{ color: '#bbb', fontSize: 13, padding: '12px 0', lineHeight: 1.5 }}>
-            No season ratings yet. Invoke the <code style={{ background: '#f5f5f5', padding: '1px 5px', borderRadius: 3, fontSize: 12 }}>seed-franchise-seasons</code> Edge Function once to populate.
+            No season data yet. Run <code style={{ background: '#f5f5f5', padding: '1px 5px', borderRadius: 3, fontSize: 12 }}>seed-franchise-seasons</code> to populate ratings,
+            and <code style={{ background: '#f5f5f5', padding: '1px 5px', borderRadius: 3, fontSize: 12 }}>seed-season-ppg</code> to populate raw points.
           </div>
         ) : (
           <>
-            {/* Career-average summary row */}
-            {avgOrtg != null && (
-              <div style={{ display: 'flex', gap: 24, marginBottom: 12, padding: '8px 12px', background: '#f5f7ff', borderRadius: 6 }}>
-                {[
-                  ['CAREER OFF RTG', avgOrtg.toFixed(1), '#1565c0'],
-                  ['CAREER DEF RTG', avgDrtg?.toFixed(1) ?? '—', '#b71c1c'],
-                  ['CAREER NET RTG', avgOrtg != null && avgDrtg != null ? ((avgOrtg - avgDrtg) > 0 ? '+' : '') + (avgOrtg - avgDrtg).toFixed(1) : '—', avgOrtg > avgDrtg ? '#2e7d32' : '#c62828'],
-                ].map(([lbl, val, col]) => (
-                  <div key={lbl}>
-                    <div style={{ fontSize: 9, fontWeight: 700, color: '#bbb', letterSpacing: '0.6px' }}>{lbl}</div>
-                    <div style={{ fontSize: 20, fontWeight: 800, color: col }}>{val}</div>
-                  </div>
-                ))}
-              </div>
-            )}
+            {/* Career averages summary */}
+            <div style={{ display: 'flex', gap: 20, marginBottom: 12, padding: '10px 14px', background: '#f5f7ff', borderRadius: 6, flexWrap: 'wrap' }}>
+              {avgPtsFor != null && ([
+                ['AVG PTS/G',  avgPtsFor.toFixed(1),   '#e65100'],
+                ['AVG OPP/G',  avgPtsAgainst?.toFixed(1) ?? '—', '#6a1b9a'],
+                ['AVG DIFF',   avgPtsFor != null && avgPtsAgainst != null
+                                 ? ((avgPtsFor - avgPtsAgainst) > 0 ? '+' : '') + (avgPtsFor - avgPtsAgainst).toFixed(1)
+                                 : '—',
+                               avgPtsFor > avgPtsAgainst ? '#2e7d32' : '#c62828'],
+              ].map(([lbl, val, col]) => (
+                <div key={lbl}>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: '#bbb', letterSpacing: '0.6px' }}>{lbl}</div>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: col }}>{val}</div>
+                </div>
+              )))}
+              {avgPtsFor != null && avgOrtg != null && (
+                <div style={{ width: 1, background: '#dde', alignSelf: 'stretch', margin: '0 4px' }} />
+              )}
+              {avgOrtg != null && ([
+                ['OFF RTG',  avgOrtg.toFixed(1),  '#1565c0'],
+                ['DEF RTG',  avgDrtg?.toFixed(1) ?? '—', '#b71c1c'],
+                ['NET RTG',  avgOrtg != null && avgDrtg != null
+                               ? ((avgOrtg - avgDrtg) > 0 ? '+' : '') + (avgOrtg - avgDrtg).toFixed(1)
+                               : '—',
+                             avgOrtg > avgDrtg ? '#2e7d32' : '#c62828'],
+              ].map(([lbl, val, col]) => (
+                <div key={lbl}>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: '#bbb', letterSpacing: '0.6px' }}>{lbl}</div>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: col }}>{val}</div>
+                </div>
+              )))}
+            </div>
 
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-              <thead>
-                <tr style={{ borderBottom: '2px solid #ebebeb' }}>
-                  {['SEASON','FRANCHISE','W','L','OFF RTG','DEF RTG','NET RTG'].map(h => (
-                    <th key={h} style={{
-                      textAlign: ['SEASON','FRANCHISE'].includes(h) ? 'left' : 'right',
-                      padding: '3px 8px', fontSize: 9, fontWeight: 700, color: '#bbb', letterSpacing: '0.6px',
-                    }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {seasonData.map((row, i) => {
-                  const net    = row.ortg != null && row.drtg != null ? row.ortg - row.drtg : null;
-                  const netStr = net != null ? (net > 0 ? '+' : '') + net.toFixed(1) : '—';
-                  return (
-                    <tr key={i} style={{ borderBottom: '1px solid #f5f5f5', background: i % 2 === 0 ? '#fff' : '#fafafa' }}>
-                      <td style={{ padding: '5px 8px', color: '#666', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                        {fmtSeason(row.season_year)}
-                      </td>
-                      <td style={{ padding: '5px 8px', color: TEAM_COLORS[row.franchise] || '#444', fontWeight: 600, fontSize: 11 }}>
-                        {shortName(row.franchise)}
-                      </td>
-                      <td style={{ padding: '5px 8px', textAlign: 'right', color: '#2e7d32', fontWeight: 700 }}>{row.wins ?? '—'}</td>
-                      <td style={{ padding: '5px 8px', textAlign: 'right', color: '#c62828' }}>{row.losses ?? '—'}</td>
-                      <td style={{ padding: '5px 8px', textAlign: 'right', color: '#1565c0', fontWeight: 600 }}>
-                        {row.ortg != null ? row.ortg.toFixed(1) : '—'}
-                      </td>
-                      <td style={{ padding: '5px 8px', textAlign: 'right', color: '#b71c1c', fontWeight: 600 }}>
-                        {row.drtg != null ? row.drtg.toFixed(1) : '—'}
-                      </td>
-                      <td style={{
-                        padding: '5px 8px', textAlign: 'right', fontWeight: 700,
-                        color: net != null ? (net > 0 ? '#2e7d32' : '#c62828') : '#bbb',
-                      }}>{netStr}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, minWidth: 580 }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid #ebebeb' }}>
+                    {[
+                      ['SEASON',   true],  ['FRANCHISE', true],
+                      ['W',        false], ['L',         false],
+                      ['PTS/G',    false], ['OPP/G',     false], ['DIFF',    false],
+                      ['OFF RTG',  false], ['DEF RTG',   false], ['NET RTG', false],
+                    ].map(([h, left]) => (
+                      <th key={h} style={{
+                        textAlign: left ? 'left' : 'right',
+                        padding: '3px 6px', fontSize: 9, fontWeight: 700, color: '#bbb', letterSpacing: '0.6px',
+                        whiteSpace: 'nowrap',
+                      }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {seasonData.map((row, i) => {
+                    const netRtg    = row.ortg != null && row.drtg != null ? row.ortg - row.drtg : null;
+                    const rawDiff   = row.pts_for != null && row.pts_against != null ? row.pts_for - row.pts_against : null;
+                    const fmtNet    = (n) => n != null ? (n > 0 ? '+' : '') + n.toFixed(1) : '—';
+                    return (
+                      <tr key={i} style={{ borderBottom: '1px solid #f5f5f5', background: i % 2 === 0 ? '#fff' : '#fafafa' }}>
+                        <td style={{ padding: '5px 6px', color: '#666', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                          {fmtSeason(row.season_year)}
+                        </td>
+                        <td style={{ padding: '5px 6px', color: TEAM_COLORS[row.franchise] || '#444', fontWeight: 600, fontSize: 11, whiteSpace: 'nowrap' }}>
+                          {shortName(row.franchise)}
+                        </td>
+                        <td style={{ padding: '5px 6px', textAlign: 'right', color: '#2e7d32', fontWeight: 700 }}>{row.wins ?? '—'}</td>
+                        <td style={{ padding: '5px 6px', textAlign: 'right', color: '#c62828' }}>{row.losses ?? '—'}</td>
+                        {/* Raw PPG */}
+                        <td style={{ padding: '5px 6px', textAlign: 'right', color: '#e65100', fontWeight: 700 }}>
+                          {row.pts_for != null ? row.pts_for.toFixed(1) : '—'}
+                        </td>
+                        <td style={{ padding: '5px 6px', textAlign: 'right', color: '#6a1b9a', fontWeight: 600 }}>
+                          {row.pts_against != null ? row.pts_against.toFixed(1) : '—'}
+                        </td>
+                        <td style={{ padding: '5px 6px', textAlign: 'right', fontWeight: 700,
+                          color: rawDiff != null ? (rawDiff > 0 ? '#2e7d32' : '#c62828') : '#bbb' }}>
+                          {fmtNet(rawDiff)}
+                        </td>
+                        {/* Efficiency ratings */}
+                        <td style={{ padding: '5px 6px', textAlign: 'right', color: '#1565c0', fontWeight: 600 }}>
+                          {row.ortg != null ? row.ortg.toFixed(1) : '—'}
+                        </td>
+                        <td style={{ padding: '5px 6px', textAlign: 'right', color: '#b71c1c', fontWeight: 600 }}>
+                          {row.drtg != null ? row.drtg.toFixed(1) : '—'}
+                        </td>
+                        <td style={{ padding: '5px 6px', textAlign: 'right', fontWeight: 700,
+                          color: netRtg != null ? (netRtg > 0 ? '#2e7d32' : '#c62828') : '#bbb' }}>
+                          {fmtNet(netRtg)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </>
         )}
       </div>
@@ -246,7 +291,7 @@ export default function CoachesTab({ coachData }) {
     const queries = coach.stints.map(s =>
       supabase
         .from('franchise_seasons')
-        .select('franchise, season_year, wins, losses, ortg, drtg')
+        .select('franchise, season_year, wins, losses, ortg, drtg, pts_for, pts_against')
         .eq('franchise', s.franchise)
         .gte('season_year', s.start)
         .lte('season_year', s.end - 1)
