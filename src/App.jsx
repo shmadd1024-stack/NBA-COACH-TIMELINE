@@ -202,7 +202,7 @@ export default function App() {
             background: 'linear-gradient(90deg, #1a1a2e 0%, #c0392b 50%, #e67e22 100%)',
             WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
           }}>
-            NBA HEAD COACHING TIMELINES
+            NBA HEAD COACH DB
           </h1>
           <span style={{ color: '#aaa', fontSize: 13 }}>1946 – 2026 · {coachData.length} coaching stints</span>
         </div>
