@@ -98,34 +98,40 @@ function StatRow({ label, val1, val2, fmt, higherIsBetter = true }) {
     ? (n1 > n2 ? 1 : n1 < n2 ? 2 : 0)
     : (n1 < n2 ? 1 : n1 > n2 ? 2 : 0);
 
+  const GRID = { display: 'grid', gridTemplateColumns: '1fr 200px 1fr' };
+
   return (
     <div style={{ marginBottom: 14 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+      {/* Values */}
+      <div style={{ ...GRID, alignItems: 'center', marginBottom: 5 }}>
         <span style={{
           fontSize: 15, fontWeight: winner === 1 ? 800 : 500,
-          color: winner === 1 ? '#1a1a2e' : '#bbb', minWidth: 80,
+          color: winner === 1 ? '#1a1a2e' : '#bbb', textAlign: 'right', paddingRight: 16,
         }}>{fmt(val1)}</span>
         <span style={{
-          fontSize: 10, fontWeight: 700, color: '#bbb', letterSpacing: '0.8px',
-          textAlign: 'center', flex: 1, padding: '0 12px',
+          fontSize: 10, fontWeight: 700, color: '#bbb', letterSpacing: '0.8px', textAlign: 'center',
         }}>{label}</span>
         <span style={{
           fontSize: 15, fontWeight: winner === 2 ? 800 : 500,
-          color: winner === 2 ? '#c0392b' : '#bbb', minWidth: 80, textAlign: 'right',
+          color: winner === 2 ? '#c0392b' : '#bbb', paddingLeft: 16,
         }}>{fmt(val2)}</span>
       </div>
-      <div style={{ display: 'flex', gap: 4, alignItems: 'center', height: 7 }}>
-        {/* Left bar (Coach A) */}
-        <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end' }}>
+      {/* Bars */}
+      <div style={{ ...GRID, alignItems: 'center', height: 7 }}>
+        {/* Left bar (Coach A) — grows right-to-left toward center */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
           <div style={{
             width: `${pct1}%`, height: 7, borderRadius: 4,
             background: winner === 1 ? '#1a1a2e' : '#e0e0e0',
             transition: 'width 0.35s',
           }} />
         </div>
-        <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#e0e0e0', flexShrink: 0 }} />
-        {/* Right bar (Coach B) */}
-        <div style={{ flex: 1 }}>
+        {/* Center dot */}
+        <div style={{ display: 'flex', justifyContent: 'center' }}>
+          <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#e0e0e0' }} />
+        </div>
+        {/* Right bar (Coach B) — grows left-to-right from center */}
+        <div>
           <div style={{
             width: `${pct2}%`, height: 7, borderRadius: 4,
             background: winner === 2 ? '#c0392b' : '#e0e0e0',
@@ -252,7 +258,7 @@ export default function CompareTab({ coachData }) {
           </div>
 
           {/* Stat bars */}
-          <div style={{ maxWidth: 680, marginBottom: 32 }}>
+          <div style={{ marginBottom: 32 }}>
             <StatRow
               label="CAREER WINS" val1={stats1.wins} val2={stats2.wins}
               fmt={v => v} higherIsBetter
