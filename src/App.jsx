@@ -6,6 +6,7 @@ import {
   TEAM_COLORS, TEAM_ACCENT, CHAMPIONSHIPS, FRANCHISE_STATS,
   coachChamps, MIN_YEAR, MAX_YEAR,
 } from "./constants";
+import { Analytics } from "@vercel/analytics/react";
 
 // ─── YearRangeSlider ─────────────────────────────────────────────────────────
 
@@ -445,6 +446,9 @@ export default function App() {
 
       {/* ══ Compare tab ════════════════════════════════════════════════════════ */}
       {activeTab === 'compare' && <CompareTab coachData={coachData} />}
+
+      {/* Vercel Web Analytics */}
+      <Analytics />
     </div>
   );
 }
