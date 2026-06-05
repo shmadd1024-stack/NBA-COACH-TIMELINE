@@ -322,15 +322,22 @@ export default function CoachesTab({ coachData }) {
     setLoadingSeasons(true);
     setSeasonData([]);
 
-    // One query per stint; include the partial season before start for mid-season hires
-    const queries = coach.stints.map(s =>
-      supabase
+    // One query per stint; include the partial season before start for mid-season hires,
+    // and exclude the last season when a mid-season replacement took over that year.
+    const queries = coach.stints.map(s => {
+      const midSeasonReplacement = coachData.some(o =>
+        o.coach !== s.coach &&
+        o.franchise === s.franchise &&
+        o.start === s.end &&
+        o.mid_season_start
+      );
+      return supabase
         .from('franchise_seasons')
         .select('franchise, season_year, wins, losses, ortg, drtg, pts_for, pts_against')
         .eq('franchise', s.franchise)
         .gte('season_year', s.mid_season_start ? s.start - 1 : s.start)
-        .lte('season_year', s.end - 1)
-    );
+        .lte('season_year', midSeasonReplacement ? s.end - 2 : s.end - 1);
+    });
 
     Promise.all(queries).then(results => {
       const data = results.flatMap(r => r.data || []);
