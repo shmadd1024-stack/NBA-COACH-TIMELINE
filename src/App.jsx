@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { supabase } from "./supabase";
 import CoachesTab from "./CoachesTab";
 import CompareTab from "./CompareTab";
+import PerformanceTab from "./PerformanceTab";
 import {
   TEAM_COLORS, TEAM_ACCENT, CHAMPIONSHIPS, FRANCHISE_STATS,
   coachChamps, MIN_YEAR, MAX_YEAR, COACH_FULL_NAMES,
@@ -169,9 +170,10 @@ export default function App() {
   for (let yr = Math.ceil(viewStart / 10) * 10; yr <= viewEnd; yr += 10) decadeTicks.push(yr);
 
   const TABS = [
-    ['coaches',  '👤 Coach Stats'],
-    ['compare',  '⚡ Compare'],
-    ['timeline', '📊 Timeline'],
+    ['coaches',     '👤 Coach Stats'],
+    ['performance', '📈 Performance'],
+    ['compare',     '⚡ Compare'],
+    ['timeline',    '📊 Timeline'],
   ];
 
   return (
@@ -206,7 +208,7 @@ export default function App() {
             background: 'linear-gradient(90deg, #1a1a2e 0%, #c0392b 50%, #e67e22 100%)',
             WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
           }}>
-            NBA HEAD COACH DB
+            NBA Coach DB
           </h1>
           <span style={{ color: '#aaa', fontSize: 13 }}>1946 – 2026 · {coachData.length} coaching stints</span>
         </div>
@@ -446,6 +448,9 @@ export default function App() {
 
       {/* ══ Coach Stats tab ════════════════════════════════════════════════════ */}
       {activeTab === 'coaches' && <CoachesTab coachData={coachData} />}
+
+      {/* ══ Performance tab ════════════════════════════════════════════════════ */}
+      {activeTab === 'performance' && <PerformanceTab coachData={coachData} />}
 
       {/* ══ Compare tab ════════════════════════════════════════════════════════ */}
       {activeTab === 'compare' && <CompareTab coachData={coachData} />}
