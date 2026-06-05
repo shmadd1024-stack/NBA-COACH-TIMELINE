@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { supabase } from './supabase';
-import { TEAM_COLORS, COACH_CHAMPS, getHistoricalName } from './constants';
+import { TEAM_COLORS, COACH_CHAMPS, COACH_FULL_NAMES, getHistoricalName } from './constants';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -51,8 +51,12 @@ function CoachDetail({ coach, seasonData, loadingSeasons, allStints = [] }) {
       const shared = allStints.some(s =>
         s.coach !== coach.coach &&
         s.franchise === row.franchise &&
-        s.start <= row.season_year &&
-        s.end - 1 >= row.season_year
+        (
+          // Other coach's tenure range overlaps this season (hired coach side)
+          (s.start <= row.season_year && s.end - 1 >= row.season_year) ||
+          // Next coach was a mid-season hire starting the following year (fired coach side)
+          (s.mid_season_start && s.start === row.season_year + 1)
+        )
       );
       if (shared) keys.add(`${row.franchise}|${row.season_year}`);
     }
@@ -73,7 +77,7 @@ function CoachDetail({ coach, seasonData, loadingSeasons, allStints = [] }) {
       {/* ── Header ── */}
       <div style={{ padding: '22px 28px 16px', borderBottom: '1px solid #ebebeb', background: '#fafafa' }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
-          <h2 style={{ margin: 0, fontSize: 26, fontWeight: 800, color: '#1a1a2e' }}>{coach.coach}</h2>
+          <h2 style={{ margin: 0, fontSize: 26, fontWeight: 800, color: '#1a1a2e' }}>{COACH_FULL_NAMES[coach.coach] || coach.coach}</h2>
           {coach.rings > 0 && (
             <span style={{ fontSize: 18 }}>
               {coach.rings > 5 ? `🏆 ×${coach.rings}` : '🏆'.repeat(coach.rings)}
@@ -293,11 +297,13 @@ export default function CoachesTab({ coachData }) {
   const displayed = useMemo(() => {
     const q = filter.toLowerCase();
     return coaches
-      .filter(c =>
-        !q ||
-        c.coach.toLowerCase().includes(q) ||
-        c.teams.some(t => t.toLowerCase().includes(q))
-      )
+      .filter(c => {
+        if (!q) return true;
+        const full = COACH_FULL_NAMES[c.coach] || '';
+        return c.coach.toLowerCase().includes(q) ||
+          full.toLowerCase().includes(q) ||
+          c.teams.some(t => t.toLowerCase().includes(q));
+      })
       .sort((a, b) => {
         if (sortBy === 'wins')    return b.wins - a.wins;
         if (sortBy === 'winPct')  return b.winPct - a.winPct;
@@ -316,13 +322,13 @@ export default function CoachesTab({ coachData }) {
     setLoadingSeasons(true);
     setSeasonData([]);
 
-    // One query per stint; end_year is the year after the last season
+    // One query per stint; include the partial season before start for mid-season hires
     const queries = coach.stints.map(s =>
       supabase
         .from('franchise_seasons')
         .select('franchise, season_year, wins, losses, ortg, drtg, pts_for, pts_against')
         .eq('franchise', s.franchise)
-        .gte('season_year', s.start)
+        .gte('season_year', s.mid_season_start ? s.start - 1 : s.start)
         .lte('season_year', s.end - 1)
     );
 

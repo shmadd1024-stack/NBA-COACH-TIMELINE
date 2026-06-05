@@ -4,7 +4,7 @@ import CoachesTab from "./CoachesTab";
 import CompareTab from "./CompareTab";
 import {
   TEAM_COLORS, TEAM_ACCENT, CHAMPIONSHIPS, FRANCHISE_STATS,
-  coachChamps, MIN_YEAR, MAX_YEAR,
+  coachChamps, MIN_YEAR, MAX_YEAR, COACH_FULL_NAMES,
 } from "./constants";
 
 // ─── YearRangeSlider ─────────────────────────────────────────────────────────
@@ -102,7 +102,7 @@ export default function App() {
   useEffect(() => {
     supabase
       .from('coaching_stints')
-      .select('franchise, coach, start_year, end_year, wins, losses, is_active')
+      .select('franchise, coach, start_year, end_year, wins, losses, is_active, mid_season_start')
       .order('franchise')
       .order('start_year')
       .then(({ data, error }) => {
@@ -150,10 +150,14 @@ export default function App() {
     return a.localeCompare(b);
   });
 
-  const filteredFranchises = sortedFranchises.filter(f =>
-    f.toLowerCase().includes(search.toLowerCase()) ||
-    coachData.some(d => d.franchise === f && d.coach.toLowerCase().includes(search.toLowerCase()))
-  );
+  const filteredFranchises = sortedFranchises.filter(f => {
+    const q = search.toLowerCase();
+    return f.toLowerCase().includes(q) ||
+      coachData.some(d => d.franchise === f && (
+        d.coach.toLowerCase().includes(q) ||
+        (COACH_FULL_NAMES[d.coach] || '').toLowerCase().includes(q)
+      ));
+  });
 
   const svgW     = 900;
   const svgH     = PAD_TOP + filteredFranchises.length * ROW_H + PAD_BOT;
