@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { TEAM_COLORS, COACH_CHAMPS, getHistoricalName } from './constants';
+import { TEAM_COLORS, COACH_CHAMPS, COACH_FULL_NAMES, getHistoricalName } from './constants';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -33,10 +33,13 @@ function CoachDropdown({ label, accent, value, onChange, options }) {
   const [open,   setOpen]   = useState(false);
 
   const filtered = options
-    .filter(o => o.toLowerCase().includes(search.toLowerCase()))
+    .filter(o => {
+      const q = search.toLowerCase();
+      return o.toLowerCase().includes(q) || (COACH_FULL_NAMES[o] || '').toLowerCase().includes(q);
+    })
     .slice(0, 22);
 
-  const display = open ? search : (value || '');
+  const display = open ? search : (value ? (COACH_FULL_NAMES[value] || value) : '');
 
   return (
     <div style={{ width: 260, position: 'relative' }}>
@@ -77,7 +80,7 @@ function CoachDropdown({ label, accent, value, onChange, options }) {
               }}
               onMouseEnter={e => { e.currentTarget.style.background = '#f5f7ff'; }}
               onMouseLeave={e => { e.currentTarget.style.background = '#fff'; }}>
-              {name}
+              {COACH_FULL_NAMES[name] || name}
             </div>
           ))}
         </div>
@@ -240,7 +243,7 @@ export default function CompareTab({ coachData }) {
           {/* Coach headers */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 28 }}>
             <div>
-              <div style={{ fontSize: 26, fontWeight: 800, color: ACCENT_A }}>{coach1}</div>
+              <div style={{ fontSize: 26, fontWeight: 800, color: ACCENT_A }}>{COACH_FULL_NAMES[coach1] || coach1}</div>
               <div style={{ fontSize: 12, color: '#aaa', marginTop: 2 }}>
                 {stats1.firstYear}–{stats1.lastYear}
                 {stats1.isActive && <span style={{ marginLeft: 6, color: '#2e7d32', fontWeight: 700 }}>● ACTIVE</span>}
@@ -248,7 +251,7 @@ export default function CompareTab({ coachData }) {
               <div style={{ fontSize: 12, color: '#bbb' }}>{stats1.teams.map(shortName).join(' · ')}</div>
             </div>
             <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 26, fontWeight: 800, color: ACCENT_B }}>{coach2}</div>
+              <div style={{ fontSize: 26, fontWeight: 800, color: ACCENT_B }}>{COACH_FULL_NAMES[coach2] || coach2}</div>
               <div style={{ fontSize: 12, color: '#aaa', marginTop: 2 }}>
                 {stats2.firstYear}–{stats2.lastYear}
                 {stats2.isActive && <span style={{ marginLeft: 6, color: '#2e7d32', fontWeight: 700 }}>● ACTIVE</span>}
@@ -294,7 +297,7 @@ export default function CompareTab({ coachData }) {
             {[[coach1, stats1, ACCENT_A], [coach2, stats2, ACCENT_B]].map(([name, st, acc]) => (
               <div key={name}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: acc, letterSpacing: '0.8px', marginBottom: 8 }}>
-                  {name.toUpperCase()} — COACHING STINTS
+                  {(COACH_FULL_NAMES[name] || name).toUpperCase()} — COACHING STINTS
                 </div>
                 <StintsTable stats={st} accent={acc} />
               </div>
