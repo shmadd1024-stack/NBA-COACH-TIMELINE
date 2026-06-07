@@ -43,18 +43,17 @@ function shortName(franchise) {
 function CoachDetail({ coach, seasonData, loadingSeasons, allStints = [] }) {
   const color   = TEAM_COLORS[coach.teams[0]] || '#444';
 
-  // Detect seasons where another head coach also coached that franchise —
-  // meaning this coach was hired or fired mid-season that year.
+  // Detect seasons where a coaching change happened mid-season, but only for rows
+  // that weren't already corrected to show the coach's actual partial record.
   const partialSeasonKeys = useMemo(() => {
     const keys = new Set();
     for (const row of seasonData) {
+      if (row._corrected) continue;
       const shared = allStints.some(s =>
         s.coach !== coach.coach &&
         s.franchise === row.franchise &&
         (
-          // Other coach's tenure range overlaps this season (hired coach side)
           (s.start <= row.season_year && s.end - 1 >= row.season_year) ||
-          // Next coach was a mid-season hire starting the following year (fired coach side)
           (s.mid_season_start && s.start === row.season_year + 1)
         )
       );
@@ -226,6 +225,7 @@ function CoachDetail({ coach, seasonData, loadingSeasons, allStints = [] }) {
                     const rawDiff   = row.pts_for != null && row.pts_against != null ? row.pts_for - row.pts_against : null;
                     const fmtNet    = (n) => n != null ? (n > 0 ? '+' : '') + n.toFixed(1) : '—';
                     const isPartial = partialSeasonKeys.has(`${row.franchise}|${row.season_year}`);
+                    const corrected = row._corrected;
                     return (
                       <tr key={i} style={{ borderBottom: '1px solid #f5f5f5', background: i % 2 === 0 ? '#fff' : '#fafafa' }}>
                         <td style={{ padding: '5px 6px', color: '#666', fontWeight: 600, whiteSpace: 'nowrap' }}>
@@ -234,14 +234,14 @@ function CoachDetail({ coach, seasonData, loadingSeasons, allStints = [] }) {
                         <td style={{ padding: '5px 6px', color: TEAM_COLORS[getHistoricalName(row.franchise, row.season_year)] || '#444', fontWeight: 600, fontSize: 11, whiteSpace: 'nowrap' }}>
                           {getHistoricalName(row.franchise, row.season_year)}
                         </td>
-                        {/* W/L: gray + asterisk for shared (mid-season change) seasons */}
+                        {/* W/L: corrected rows show actual coach record; uncorrected partial rows show franchise total with asterisk */}
                         <td style={{ padding: '5px 6px', textAlign: 'right', color: isPartial ? '#aaa' : '#2e7d32', fontWeight: 700 }}
                             title={isPartial ? 'Franchise season record — coach change mid-season' : undefined}>
-                          {row.wins ?? '—'}{isPartial ? '*' : ''}
+                          {row.wins ?? '—'}{isPartial && !corrected ? '*' : ''}
                         </td>
                         <td style={{ padding: '5px 6px', textAlign: 'right', color: isPartial ? '#aaa' : '#c62828' }}
                             title={isPartial ? 'Franchise season record — coach change mid-season' : undefined}>
-                          {row.losses ?? '—'}{isPartial ? '*' : ''}
+                          {row.losses ?? '—'}{isPartial && !corrected ? '*' : ''}
                         </td>
                         {/* Raw PPG */}
                         <td style={{ padding: '5px 6px', textAlign: 'right', color: '#e65100', fontWeight: 700 }}>
@@ -313,7 +313,11 @@ export default function CoachesTab({ coachData }) {
       });
   }, [coaches, filter, sortBy]);
 
-  // Fetch season data whenever selected coach changes
+  // Fetch season data whenever selected coach changes.
+  // Two-phase: (1) fetch all seasons for each stint, (2) fetch predecessor seasons for
+  // mid-season-start stints so we can compute that coach's actual partial first-season record.
+  // coaching_stints.wins EXCLUDES the partial first season (for mid_season_start coaches)
+  // but INCLUDES the partial last season (when a coach was fired mid-season).
   useEffect(() => {
     if (!selectedCoach) { setSeasonData([]); return; }
     const coach = coaches.find(c => c.coach === selectedCoach);
@@ -322,30 +326,133 @@ export default function CoachesTab({ coachData }) {
     setLoadingSeasons(true);
     setSeasonData([]);
 
-    // One query per stint; include the partial season before start for mid-season hires,
-    // and exclude the last season when a mid-season replacement took over that year.
-    const queries = coach.stints.map(s => {
-      const midSeasonReplacement = coachData.some(o =>
-        o.coach !== s.coach &&
-        o.franchise === s.franchise &&
-        o.start === s.end &&
-        o.mid_season_start
-      );
-      return supabase
+    // Phase 1: fetch full season range for every stint
+    const mainQueries = coach.stints.map(s =>
+      supabase
         .from('franchise_seasons')
         .select('franchise, season_year, wins, losses, ortg, drtg, pts_for, pts_against')
         .eq('franchise', s.franchise)
         .gte('season_year', s.mid_season_start ? s.start - 1 : s.start)
-        .lte('season_year', midSeasonReplacement ? s.end - 2 : s.end - 1);
-    });
+        .lte('season_year', s.end - 1)
+    );
 
-    Promise.all(queries).then(results => {
-      const data = results.flatMap(r => r.data || []);
-      data.sort((a, b) => a.season_year - b.season_year || a.franchise.localeCompare(b.franchise));
-      setSeasonData(data);
-      setLoadingSeasons(false);
+    Promise.all(mainQueries).then(mainResults => {
+      const stintData = mainResults.map((r, i) => ({
+        stint: coach.stints[i],
+        rows: (r.data || []).map(row => ({ ...row, _corrected: false })),
+      }));
+
+      // Identify mid-season-start stints that need a predecessor query
+      const predLookups = stintData
+        .filter(({ stint }) => stint.mid_season_start)
+        .map(({ stint }) => ({
+          stint,
+          pred: coachData.find(o =>
+            o.franchise === stint.franchise &&
+            o.end === stint.start &&
+            o.coach !== stint.coach
+          ),
+        }))
+        .filter(({ pred }) => pred != null);
+
+      const applyCorrections = (predDataMap = new Map()) => {
+        const allRows = [];
+
+        for (const { stint, rows } of stintData) {
+          const midEnd = coachData.some(o =>
+            o.franchise === stint.franchise &&
+            o.start === stint.end &&
+            o.mid_season_start &&
+            o.coach !== stint.coach
+          );
+
+          const out = rows.slice();
+
+          if (stint.mid_season_start) {
+            const firstYear = stint.start - 1;
+            const notFirst  = out.filter(r => r.season_year !== firstYear);
+            const sumNotFirstW = notFirst.reduce((a, r) => a + r.wins, 0);
+
+            // Detect an unmarked partial last season: if the sum of all non-first rows'
+            // franchise wins exceeds stint.wins (which excludes the first partial),
+            // the final row must be inflated with the full franchise total.
+            const effectiveMidEnd = midEnd || sumNotFirstW > stint.wins;
+            const lastYear = effectiveMidEnd && out.length > 0
+              ? out[out.length - 1].season_year
+              : null;
+
+            if (lastYear != null) {
+              const middle = notFirst.filter(r => r.season_year !== lastYear);
+              const mW = middle.reduce((a, r) => a + r.wins,   0);
+              const mL = middle.reduce((a, r) => a + r.losses, 0);
+              const lW = Math.max(0, stint.wins   - mW);
+              const lL = Math.max(0, stint.losses - mL);
+              const li = out.findIndex(r => r.season_year === lastYear);
+              if (li >= 0) out[li] = { ...out[li], wins: lW, losses: lL, _corrected: true };
+            }
+
+            // Correct the first partial season via predecessor subtraction:
+            //   this_partial = franchise_total - pred_partial
+            //   pred_partial = pred.wins - sum(pred_full_seasons)
+            const firstRow = out.find(r => r.season_year === firstYear);
+            if (firstRow) {
+              const entry = predDataMap.get(`${stint.franchise}|${stint.start}`);
+              if (entry) {
+                const { pred, predFullRows } = entry;
+                const predFullW = predFullRows.reduce((a, r) => a + r.wins,   0);
+                const predFullL = predFullRows.reduce((a, r) => a + r.losses, 0);
+                const predPartW = Math.max(0, pred.wins   - predFullW);
+                const predPartL = Math.max(0, pred.losses - predFullL);
+                const fW = Math.max(0, firstRow.wins   - predPartW);
+                const fL = Math.max(0, firstRow.losses - predPartL);
+                const fi = out.findIndex(r => r.season_year === firstYear);
+                if (fi >= 0) out[fi] = { ...out[fi], wins: fW, losses: fL, _corrected: true };
+              }
+            }
+          } else if (midEnd) {
+            // Normal start, fired mid-season: last row is partial.
+            // coaching_stints.wins includes the partial last season, so:
+            //   last_partial = wins - sum(all other rows)
+            const lastYear = stint.end - 1;
+            const others = out.filter(r => r.season_year !== lastYear);
+            const oW = others.reduce((a, r) => a + r.wins,   0);
+            const oL = others.reduce((a, r) => a + r.losses, 0);
+            const lW = Math.max(0, stint.wins   - oW);
+            const lL = Math.max(0, stint.losses - oL);
+            const li = out.findIndex(r => r.season_year === lastYear);
+            if (li >= 0) out[li] = { ...out[li], wins: lW, losses: lL, _corrected: true };
+          }
+
+          allRows.push(...out);
+        }
+
+        allRows.sort((a, b) => a.season_year - b.season_year || a.franchise.localeCompare(b.franchise));
+        setSeasonData(allRows);
+        setLoadingSeasons(false);
+      };
+
+      if (predLookups.length === 0) { applyCorrections(); return; }
+
+      // Phase 2: fetch predecessor's full seasons (used to compute their partial last record)
+      const predQueries = predLookups.map(({ stint, pred }) =>
+        supabase
+          .from('franchise_seasons')
+          .select('franchise, season_year, wins, losses')
+          .eq('franchise', pred.franchise)
+          .gte('season_year', pred.start)
+          .lte('season_year', pred.end - 2) // exclude pred's partial last season
+          .then(r => ({
+            key: `${stint.franchise}|${stint.start}`,
+            pred,
+            predFullRows: r.data || [],
+          }))
+      );
+
+      Promise.all(predQueries).then(predResults => {
+        applyCorrections(new Map(predResults.map(p => [p.key, p])));
+      });
     });
-  }, [selectedCoach, coaches]);
+  }, [selectedCoach, coaches, coachData]);
 
   const selectedCoachData = selectedCoach ? coaches.find(c => c.coach === selectedCoach) : null;
 
