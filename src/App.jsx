@@ -315,35 +315,33 @@ export default function App() {
                       y2={y + ROW_H / 2} stroke="#ececec" strokeWidth={1} />
 
                     {teamBlocks.map((block, bi) => {
-                      const x1 = Math.max(xScale(block.start), xScale(viewStart));
+                      const rawX1 = xScale(block.start);
+                      const x1 = Math.max(rawX1, xScale(viewStart));
                       const x2 = Math.min(xScale(block.end),   xScale(viewEnd));
                       const w  = x2 - x1;
                       if (w <= 0) return null;
                       const total  = block.wins + block.losses;
                       const winPct = total > 0 ? block.wins / total : 0;
-                      const blockH = 18;
-                      const by     = y + (ROW_H - blockH) / 2;
+                      const blockH = 8;
+                      const cy     = y + ROW_H / 2;
+                      const by     = cy - blockH / 2;
                       const alpha  = isHighlighted ? 1 : 0.2;
+                      const showBubble = rawX1 >= xScale(viewStart);
 
                       return (
                         <g key={bi}
                           onMouseEnter={(e) => setTooltip({ block, x: e.clientX, y: e.clientY })}
                           onMouseLeave={() => setTooltip(null)}
                           onMouseMove={(e) => setTooltip(prev => prev ? { ...prev, x: e.clientX, y: e.clientY } : null)}>
-                          <rect className="block-rect" x={x1} y={by} width={w} height={blockH} rx={2}
+                          <rect className="block-rect" x={x1} y={by} width={w} height={blockH} rx={4}
                             fill={color} opacity={alpha} />
-                          <rect x={x1} y={by} width={w * winPct} height={blockH} rx={2}
+                          <rect x={x1} y={by} width={w * winPct} height={blockH} rx={4}
                             fill={accent} opacity={alpha * 0.25} style={{ pointerEvents: 'none' }} />
                           <rect x={x1} y={by} width={w} height={2} rx={0}
-                            fill={accent} opacity={alpha * 0.7} style={{ pointerEvents: 'none' }} />
-                          {w > 30 && (
-                            <text x={x1 + w / 2} y={by + blockH / 2 + 4}
-                              textAnchor="middle"
-                              fontSize={Math.min(10, w / block.coach.length * 1.6)}
-                              fontFamily="'Barlow Condensed', sans-serif" fontWeight={600}
-                              fill="#fff" opacity={alpha * 0.9} style={{ pointerEvents: 'none' }}>
-                              {w > 60 ? block.coach : (block.coach.split(' ')[1] || block.coach)}
-                            </text>
+                            fill={accent} opacity={alpha * 0.6} style={{ pointerEvents: 'none' }} />
+                          {showBubble && (
+                            <circle cx={x1} cy={cy} r={5} fill={color} stroke="#fff" strokeWidth={2}
+                              opacity={alpha} style={{ pointerEvents: 'none' }} />
                           )}
                         </g>
                       );
